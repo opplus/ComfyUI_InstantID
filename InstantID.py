@@ -294,7 +294,8 @@ class ApplyInstantID:
                 "image_kps": ("IMAGE",),
                 "mask": ("MASK",),
                 "combine_enable":  ("BOOLEAN", {"default": False, "label_off": "OFF", "label_on": "ON"}),
-                "combine_balance": ("FLOAT", {"default": 0.5, "min": 0.1, "max": 0.9, "step": 0.1, }),
+                "combine_balance": ("FLOAT", {"default": 0.5, "min": -1, "max": 2.0, "step": 0.1, }),
+                "added_ip_weight": ("FLOAT", {"default": None, }),
             }
         }
 
@@ -303,7 +304,7 @@ class ApplyInstantID:
     FUNCTION = "apply_instantid"
     CATEGORY = "InstantID"
 
-    def apply_instantid(self, instantid, insightface, control_net, image, model, positive, negative, start_at, end_at, weight=.8, ip_weight=None, cn_strength=None, noise=0.35, image_kps=None, mask=None, combine_embeds='average',combine_enable=False,combine_balance=0.5):
+    def apply_instantid(self, instantid, insightface, control_net, image, model, positive, negative, start_at, end_at, weight=.8, ip_weight=None, cn_strength=None, noise=0.35, image_kps=None, mask=None, combine_embeds='average',combine_enable=False,combine_balance=0.5,added_ip_weight=None):
         dtype = comfy.model_management.unet_dtype()
         if dtype not in [torch.float32, torch.float16, torch.bfloat16]:
             dtype = torch.float16 if comfy.model_management.should_use_fp16() else torch.float32
@@ -328,6 +329,8 @@ class ApplyInstantID:
                         face_embed = face_embed * (1 - combine_balance) + face_embed_1 * combine_balance
         else:
             face_embed = extractFeatures(insightface, image)
+            if added_ip_weight is not None:
+                face_embed=face_embed * added_ip_weight
         if face_embed is None:
             raise Exception('Reference Image: No face detected.')
 
@@ -458,7 +461,8 @@ class ApplyInstantIDAdvanced(ApplyInstantID):
                 "image_kps": ("IMAGE",),
                 "mask": ("MASK",),
                 "combine_enable":  ("BOOLEAN", {"default": False, "label_off": "OFF", "label_on": "ON"}),
-                "combine_balance": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, }),
+                "combine_balance": ("FLOAT", {"default": 0.5, "min": -1, "max": 2.0, "step": 0.01, }),
+                "added_ip_weight": ("FLOAT",  {"default": None, }),
             }
         }
 
