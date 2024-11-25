@@ -294,7 +294,7 @@ class ApplyInstantID:
                 "image_kps": ("IMAGE",),
                 "mask": ("MASK",),
                 "combine_enable":  ("BOOLEAN", {"default": False, "label_off": "OFF", "label_on": "ON"}),
-                "combine_balance": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, }),
+                "combine_balance": ("FLOAT", {"default": 0.5, "min": 0.1, "max": 0.9, "step": 0.1, }),
             }
         }
 
