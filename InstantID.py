@@ -173,8 +173,9 @@ def extractFeatures(insightface, image, extract_kps=False):
     out = []
 
     insightface.det_model.input_size = (640,640) # reset the detection size
-
+    print(f"extractFeatures shape [{face_img.shape}]")
     for i in range(face_img.shape[0]):
+        print(f"extractFeatures [{i}] shape:[{face_img[i].shape}]")
         for size in [(size, size) for size in range(640, 128, -64)]:
             insightface.det_model.input_size = size # TODO: hacky but seems to be working
             face = insightface.get(face_img[i])
@@ -198,6 +199,28 @@ def extractFeatures(insightface, image, extract_kps=False):
     else:
         out = None
 
+    return out
+
+
+def extractFeatures_single(insightface, image):
+    face_img = tensor_to_image(image)
+    out = []
+    insightface.det_model.input_size = (640,640) # reset the detection size
+    print(f"extractFeatures shape:[{face_img.shape}]")
+    for size in [(size, size) for size in range(640, 128, -64)]:
+        insightface.det_model.input_size = size # TODO: hacky but seems to be working
+        face = insightface.get(face_img)
+        if face:
+            face = sorted(face, key=lambda x:(x['bbox'][2]-x['bbox'][0])*(x['bbox'][3]-x['bbox'][1]))[-1]
+            out.append(torch.from_numpy(face['embedding']).unsqueeze(0))
+
+            if 640 not in size:
+                print(f"\033[33mINFO: InsightFace detection resolution lowered to {size}.\033[0m")
+            break
+    if out:
+        out = torch.stack(out, dim=0)
+    else:
+        out = None
     return out
 
 class InstantIDFaceAnalysis:
@@ -270,6 +293,8 @@ class ApplyInstantID:
             "optional": {
                 "image_kps": ("IMAGE",),
                 "mask": ("MASK",),
+                "combine_enable":  ("BOOLEAN", {"default": False, "label_off": "OFF", "label_on": "ON"}),
+                "combine_balance": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, }),
             }
         }
 
@@ -278,7 +303,7 @@ class ApplyInstantID:
     FUNCTION = "apply_instantid"
     CATEGORY = "InstantID"
 
-    def apply_instantid(self, instantid, insightface, control_net, image, model, positive, negative, start_at, end_at, weight=.8, ip_weight=None, cn_strength=None, noise=0.35, image_kps=None, mask=None, combine_embeds='average'):
+    def apply_instantid(self, instantid, insightface, control_net, image, model, positive, negative, start_at, end_at, weight=.8, ip_weight=None, cn_strength=None, noise=0.35, image_kps=None, mask=None, combine_embeds='average',combine_enable=False,combine_balance=0.5):
         dtype = comfy.model_management.unet_dtype()
         if dtype not in [torch.float32, torch.float16, torch.bfloat16]:
             dtype = torch.float16 if comfy.model_management.should_use_fp16() else torch.float32
@@ -289,7 +314,20 @@ class ApplyInstantID:
         ip_weight = weight if ip_weight is None else ip_weight
         cn_strength = weight if cn_strength is None else cn_strength
 
-        face_embed = extractFeatures(insightface, image)
+        face_embed = None
+        if combine_enable==True:
+            print(f"enable face combine combine_balance is [{combine_balance}]")
+            for i, face_image in enumerate(image):
+                face_embed_1 = extractFeatures_single(insightface, face_image)
+                if face_embed_1 is None:
+                    print(f"Reference [{i}] Image: No face detected.")
+                else:
+                    if face_embed is None:
+                        face_embed = face_embed_1
+                    else:
+                        face_embed = face_embed * (1 - combine_balance) + face_embed_1 * combine_balance
+        else:
+            face_embed = extractFeatures(insightface, image)
         if face_embed is None:
             raise Exception('Reference Image: No face detected.')
 
@@ -419,6 +457,8 @@ class ApplyInstantIDAdvanced(ApplyInstantID):
             "optional": {
                 "image_kps": ("IMAGE",),
                 "mask": ("MASK",),
+                "combine_enable":  ("BOOLEAN", {"default": False, "label_off": "OFF", "label_on": "ON"}),
+                "combine_balance": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, }),
             }
         }
 
