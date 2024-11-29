@@ -329,7 +329,7 @@ class ApplyInstantID:
                         face_embed = face_embed * (1 - combine_balance) + face_embed_1 * combine_balance
         else:
             face_embed = extractFeatures(insightface, image)
-            if added_ip_weight is not None:
+            if added_ip_weight is not None and added_ip_weight>0:
                 face_embed=face_embed * added_ip_weight
         if face_embed is None:
             raise Exception('Reference Image: No face detected.')
